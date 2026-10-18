@@ -1,0 +1,3 @@
+[submodule "Vesper"]
+	path = Vesper
+	url = https://github.com/Yswag/Vesper.git
