@@ -39,6 +39,7 @@ jobs:
         env:
           INPUT_NAME: ${{ github.event.inputs.submodule }}
           DISPATCH_NAME: ${{ github.event.client_payload.submodule }}
+          SUBMODULE_TOKEN: ${{ secrets.SUBMODULE_PAT }}
         run: |
           set -euo pipefail
 
@@ -63,6 +64,10 @@ jobs:
             echo "::error::找不到 submodule: $TARGET (已知: ${all_paths[*]})"
             exit 1
           fi
+
+          # checkout 的憑證只存在 local config,submodule clone 用不到 →
+          # 用 global 的 insteadOf 把 PAT 帶進 submodule 的 clone URL(private 才抓得到)
+          git config --global url."https://x-access-token:${SUBMODULE_TOKEN}@github.com/".insteadOf "https://github.com/"
 
           # 只 checkout 被通知的這個 submodule,並取最新 (--remote) 而非 parent 記錄的舊 commit
           git submodule update --init --remote -- "$path"
