@@ -63,8 +63,8 @@ jobs:
             exit 1
           fi
 
-          # 只 checkout 被通知的這個 submodule
-          git submodule update --init -- "$path"
+          # 只 checkout 被通知的這個 submodule,並取最新 (--remote) 而非 parent 記錄的舊 commit
+          git submodule update --init --remote -- "$path"
 
           if [ ! -d "$path" ] || [ -z "$(ls -A "$path" 2>/dev/null)" ]; then
             echo "::error::submodule 目錄是空的或不存在: $path"
