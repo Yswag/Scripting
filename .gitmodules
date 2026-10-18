@@ -1,3 +1,6 @@
 [submodule "Vesper"]
 	path = Vesper
 	url = https://github.com/Yswag/Vesper.git
+[submodule "SideInstaller"]
+	path = SideInstaller
+	url = https://github.com/Yswag/SideInstaller.git

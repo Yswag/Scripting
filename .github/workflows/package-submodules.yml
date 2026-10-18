@@ -11,6 +11,7 @@ on:
         type: choice
         options:
           - Vesper
+          - SideInstaller
   # 由 submodule repo 發出通知;payload 需帶 {"submodule":"Vesper"}
   repository_dispatch:
     types: [submodule-update]
