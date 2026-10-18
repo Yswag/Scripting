@@ -1,0 +1,111 @@
+name: Package Submodule
+
+on:
+  # 手動點擊 (Actions 頁面 -> Run workflow),下拉選單挑一個 submodule
+  # 注意: choice 選項必須寫死,新增 submodule 後需回來補上
+  workflow_dispatch:
+    inputs:
+      submodule:
+        description: "要打包的 submodule"
+        required: true
+        type: choice
+        options:
+          - Vesper
+  # 由 submodule repo 發出通知;payload 需帶 {"submodule":"Vesper"}
+  repository_dispatch:
+    types: [submodule-update]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-submodules
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      # private submodule 需要 PAT; public submodule 也用同一個 token 即可
+      - name: Checkout (不含 submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          token: ${{ secrets.SUBMODULE_PAT }}
+
+      - name: Build zip for the notified submodule
+        shell: bash
+        env:
+          INPUT_NAME: ${{ github.event.inputs.submodule }}
+          DISPATCH_NAME: ${{ github.event.client_payload.submodule }}
+        run: |
+          set -euo pipefail
+
+          TARGET="${INPUT_NAME:-${DISPATCH_NAME:-}}"
+          if [ -z "$TARGET" ]; then
+            echo "::error::沒有指定 submodule (workflow_dispatch 需填 input,repository_dispatch 需帶 client_payload.submodule)"
+            exit 1
+          fi
+
+          # 解析出 submodule 的實際路徑:支援輸入「路徑」或「名稱」
+          mapfile -t all_paths < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+
+          path=""
+          for p in "${all_paths[@]}"; do
+            if [ "$p" = "$TARGET" ] || [ "$(basename "$p")" = "$TARGET" ]; then
+              path="$p"
+              break
+            fi
+          done
+
+          if [ -z "$path" ]; then
+            echo "::error::找不到 submodule: $TARGET (已知: ${all_paths[*]})"
+            exit 1
+          fi
+
+          # 只 checkout 被通知的這個 submodule
+          git submodule update --init -- "$path"
+
+          if [ ! -d "$path" ] || [ -z "$(ls -A "$path" 2>/dev/null)" ]; then
+            echo "::error::submodule 目錄是空的或不存在: $path"
+            exit 1
+          fi
+
+          mkdir -p dist
+          name="$(basename "$path")"
+          rm -f "dist/${name}.zip"
+          zip -r -q "dist/${name}.zip" "$path" \
+            -x "${path}/.git" "${path}/.git/*" "*/.git/*"
+          echo "packed: dist/${name}.zip"
+          ls -lh "dist/${name}.zip"
+
+      - name: Publish zip to dist branch
+        shell: bash
+        env:
+          DIST_BRANCH: dist
+          AUTH_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          WORK="$(mktemp -d)"
+
+          if git ls-remote --exit-code --heads "$AUTH_URL" "$DIST_BRANCH" >/dev/null 2>&1; then
+            git clone -q --branch "$DIST_BRANCH" --single-branch "$AUTH_URL" "$WORK/dist"
+          else
+            git -C "$WORK" init -q -b "$DIST_BRANCH" dist
+            git -C "$WORK/dist" remote add origin "$AUTH_URL"
+          fi
+
+          # dist branch 根目錄即為發佈目錄;只更新本次的 zip,其他 submodule 的 zip 保留
+          cp -f dist/*.zip "$WORK/dist/"
+
+          cd "$WORK/dist"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "沒有變更,略過 push"
+          else
+            git commit -q -m "chore: package submodule ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+            git push origin "$DIST_BRANCH"
+          fi
