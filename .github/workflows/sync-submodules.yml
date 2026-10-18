@@ -1,0 +1,80 @@
+name: Sync Submodule Pointers
+
+# 把 parent 記錄的 submodule 指標自動更新到各 submodule 的最新 commit
+on:
+  # submodule 通知時同步 (與 package workflow 同一個事件)
+  repository_dispatch:
+    types: [submodule-update]
+  # 每天補漏,避免漏掉通知
+  schedule:
+    - cron: "0 3 * * *"
+  # 手動 (留空 = 同步全部)
+  workflow_dispatch:
+    inputs:
+      submodule:
+        description: "只同步某個 submodule (留空 = 全部)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-submodules
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # private submodule 需要 PAT
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SUBMODULE_PAT }}
+          submodules: false
+
+      - name: Update submodule pointer(s) to latest
+        shell: bash
+        env:
+          INPUT_NAME: ${{ github.event.inputs.submodule }}
+          DISPATCH_NAME: ${{ github.event.client_payload.submodule }}
+          SUBMODULE_TOKEN: ${{ secrets.SUBMODULE_PAT }}
+        run: |
+          set -euo pipefail
+
+          # checkout 的憑證只存在 local config,submodule clone 用不到 →
+          # 用 global 的 insteadOf 把 PAT 帶進 submodule 的 clone URL
+          git config --global url."https://x-access-token:${SUBMODULE_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+          TARGET="${INPUT_NAME:-${DISPATCH_NAME:-}}"
+
+          if [ -n "$TARGET" ]; then
+            mapfile -t all_paths < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+            path=""
+            for p in "${all_paths[@]}"; do
+              if [ "$p" = "$TARGET" ] || [ "$(basename "$p")" = "$TARGET" ]; then
+                path="$p"
+                break
+              fi
+            done
+            [ -n "$path" ] || { echo "::error::找不到 submodule: $TARGET"; exit 1; }
+            git submodule update --init --remote -- "$path"
+          else
+            git submodule update --init --remote
+          fi
+
+      - name: Commit pointer changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git status --porcelain --untracked-files=no | grep -q .; then
+            git add -A
+            git commit -m "chore: sync submodule pointer(s) ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+            git push
+          else
+            echo "submodule 指標已是最新,無變更"
+          fi
