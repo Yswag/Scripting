@@ -12,3 +12,4 @@
 | guyso | 查看韓國各大音源平台榜單（Melon、Genie、FLO、Bugs、VIBE、Circle Chart、YouTube），支援每日榜、走勢圖與搜尋。 | [導入](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fraw.githubusercontent.com%2FYswag%2FScripting%2Frefs%2Fheads%2Fdist%2Fguyso.zip%22%5D) |
 | FairDecrypt | 基於 FairPlayed 的 IPA Decrypter。 | [導入](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fraw.githubusercontent.com%2FYswag%2FScripting%2Frefs%2Fheads%2Fdist%2FFairDecrypt.scripting%22%5D) |
 | rich4 | 大富翁4 | [導入](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fraw.githubusercontent.com%2FYswag%2FScripting%2Frefs%2Fheads%2Fdist%2Frich4.scripting%22%5D) |
+| Yobi | YouTube 與 bilibili 雙來源串流播放器，支援彈幕、字幕、子母畫面、SponsorBlock 與 4K 播放。 | [導入](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fgithub.com%2FYswag%2FYobi%22%5D) |
